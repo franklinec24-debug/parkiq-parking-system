@@ -100,6 +100,24 @@ async function initDb() {
       INSERT INTO billing (vehicle_id, user_id, vehicle_number, slot_number, entry_time, exit_time, duration_minutes, amount, payment_status)
       VALUES (3, 3, 'TN38EF9012', 'A03', NOW() - INTERVAL '3 hours', NOW() - INTERVAL '30 minutes', 150, 60.00, 'pending');
 
+      INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, owner_name, slot_id, entry_time, exit_time, status)
+      VALUES (2, 'TN38AB1234', '4W', 'Raj Kumar', NULL, NOW() - INTERVAL '3 days 4 hours', NOW() - INTERVAL '3 days 1 hour', 'exited');
+
+      INSERT INTO billing (vehicle_id, user_id, vehicle_number, slot_number, entry_time, exit_time, duration_minutes, amount, payment_status, payment_time)
+      VALUES (4, 2, 'TN38AB1234', 'A01', NOW() - INTERVAL '3 days 4 hours', NOW() - INTERVAL '3 days 1 hour', 180, 60.00, 'paid', NOW() - INTERVAL '3 days 1 hour');
+
+      INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, owner_name, slot_id, entry_time, exit_time, status)
+      VALUES (2, 'TN38GH4321', '2W', 'Raj Kumar', NULL, NOW() - INTERVAL '1 day 5 hours', NOW() - INTERVAL '1 day 3 hours', 'exited');
+
+      INSERT INTO billing (vehicle_id, user_id, vehicle_number, slot_number, entry_time, exit_time, duration_minutes, amount, payment_status, payment_time)
+      VALUES (5, 2, 'TN38GH4321', 'B02', NOW() - INTERVAL '1 day 5 hours', NOW() - INTERVAL '1 day 3 hours', 120, 20.00, 'paid', NOW() - INTERVAL '1 day 3 hours');
+
+      INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, owner_name, slot_id, entry_time, exit_time, status)
+      VALUES (3, 'TN38EF9012', '4W', 'Priya Sharma', NULL, NOW() - INTERVAL '4 days 6 hours', NOW() - INTERVAL '4 days 2 hours', 'exited');
+
+      INSERT INTO billing (vehicle_id, user_id, vehicle_number, slot_number, entry_time, exit_time, duration_minutes, amount, payment_status, payment_time)
+      VALUES (6, 3, 'TN38EF9012', 'A07', NOW() - INTERVAL '4 days 6 hours', NOW() - INTERVAL '4 days 2 hours', 240, 80.00, 'paid', NOW() - INTERVAL '4 days 2 hours');
+
       INSERT INTO bookings (user_id, slot_id, vehicle_number, booking_date, start_time, end_time, status)
       VALUES (2, 5, 'TN38AB1234', (NOW() AT TIME ZONE 'Asia/Kolkata')::date + 1, '10:00:00', '14:00:00', 'active');
     `);

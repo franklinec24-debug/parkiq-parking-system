@@ -219,6 +219,21 @@ app.get('/staff/parked.php', requireStaffPage, asyncHandler(async (req, res) => 
   res.send(views.renderStaffParked({ user: req.user, parked: rows }));
 }));
 
+app.get('/staff/history.php', requireStaffPage, asyncHandler(async (req, res) => {
+  const { rows } = await query(`
+    SELECT v.id, v.vehicle_number, v.vehicle_type, v.owner_name, v.entry_time, v.exit_time, v.status,
+           COALESCE(ps.slot_number, b.slot_number) AS slot_number,
+           b.duration_minutes, b.amount, b.payment_status,
+           u.name AS user_name
+    FROM vehicles v
+    LEFT JOIN parking_slots ps ON ps.id = v.slot_id
+    LEFT JOIN billing b ON b.vehicle_id = v.id
+    LEFT JOIN users u ON u.id = v.user_id
+    ORDER BY COALESCE(v.exit_time, v.entry_time, v.created_at) DESC
+  `);
+  res.send(views.renderStaffHistory({ user: req.user, history: rows }));
+}));
+
 app.get('/staff/payments.php', requireStaffPage, asyncHandler(async (req, res) => {
   const filter = ['pending', 'paid'].includes(req.query.filter) ? req.query.filter : 'all';
   const where = filter === 'all' ? '' : 'WHERE b.payment_status = $1';
@@ -306,11 +321,12 @@ app.get('/user/dashboard.php', requireUserPage, asyncHandler(async (req, res) =>
       ORDER BY b.booking_date ASC LIMIT 5
     `, [uid]),
     query(`
-      SELECT v.*, ps.slot_number
+      SELECT v.*, COALESCE(ps.slot_number, b.slot_number) AS slot_number
       FROM vehicles v
       LEFT JOIN parking_slots ps ON ps.id = v.slot_id
+      LEFT JOIN billing b ON b.vehicle_id = v.id
       WHERE v.user_id = $1
-      ORDER BY v.created_at DESC LIMIT 5
+      ORDER BY COALESCE(v.entry_time, v.created_at) DESC LIMIT 5
     `, [uid]),
   ]);
 
@@ -329,11 +345,12 @@ app.get('/user/dashboard.php', requireUserPage, asyncHandler(async (req, res) =>
 
 app.get('/user/history.php', requireUserPage, asyncHandler(async (req, res) => {
   const { rows } = await query(`
-    SELECT v.*, ps.slot_number
+    SELECT v.*, COALESCE(ps.slot_number, b.slot_number) AS slot_number
     FROM vehicles v
     LEFT JOIN parking_slots ps ON ps.id = v.slot_id
+    LEFT JOIN billing b ON b.vehicle_id = v.id
     WHERE v.user_id = $1
-    ORDER BY v.created_at DESC
+    ORDER BY COALESCE(v.entry_time, v.created_at) DESC
   `, [req.user.user_id]);
   res.send(views.renderUserHistory({ user: req.user, history: rows }));
 }));
@@ -420,9 +437,22 @@ app.post('/php/vehicle_handler.php', requireStaffJson, asyncHandler(async (req, 
       }
       const slot = slotRes.rows[0];
 
+      // Link vehicle to matching customer account from recent booking or prior entry if available
+      const ownerMatch = await client.query(
+        `SELECT user_id FROM (
+           SELECT user_id, created_at FROM bookings WHERE UPPER(vehicle_number) = $1
+           UNION ALL
+           SELECT v.user_id, v.created_at FROM vehicles v
+           JOIN users u ON u.id = v.user_id
+           WHERE UPPER(v.vehicle_number) = $1 AND u.role = 'user'
+         ) m ORDER BY created_at DESC LIMIT 1`,
+        [vehicleNumber]
+      );
+      const linkedUserId = ownerMatch.rows[0]?.user_id || req.user.user_id;
+
       await client.query(
         "INSERT INTO vehicles (user_id, vehicle_number, vehicle_type, owner_name, slot_id, entry_time, status) VALUES ($1, $2, $3, $4, $5, NOW(), 'parked')",
-        [req.user.user_id, vehicleNumber, vehicleType, ownerName, slot.id]
+        [linkedUserId, vehicleNumber, vehicleType, ownerName, slot.id]
       );
       await client.query("UPDATE parking_slots SET status = 'occupied', updated_at = NOW() WHERE id = $1", [slot.id]);
       await client.query('COMMIT');
@@ -531,7 +561,6 @@ app.get('/php/vehicle_api.php', requireAuthJson, asyncHandler(async (req, res) =
     const { rows } = await query(`
       SELECT b.vehicle_number, b.slot_number, b.duration_minutes, b.amount, b.payment_status, b.exit_time
       FROM billing b
-      WHERE (b.exit_time AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
       ORDER BY b.exit_time DESC LIMIT 20
     `);
     return res.json({ success: true, vehicles: rows });
@@ -549,11 +578,13 @@ app.get('/php/vehicle_api.php', requireAuthJson, asyncHandler(async (req, res) =
       ownerFilter = 'AND v.user_id = $2';
     }
     const { rows } = await query(`
-      SELECT v.vehicle_number, v.vehicle_type, v.entry_time, v.exit_time, v.status, ps.slot_number
+      SELECT v.vehicle_number, v.vehicle_type, v.entry_time, v.exit_time, v.status,
+             COALESCE(ps.slot_number, b.slot_number) AS slot_number
       FROM vehicles v
       LEFT JOIN parking_slots ps ON ps.id = v.slot_id
+      LEFT JOIN billing b ON b.vehicle_id = v.id
       WHERE v.vehicle_number ILIKE $1 ${ownerFilter}
-      ORDER BY v.created_at DESC LIMIT 20
+      ORDER BY COALESCE(v.entry_time, v.created_at) DESC LIMIT 20
     `, params);
     return res.json({ success: true, vehicles: rows });
   }
