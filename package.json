@@ -1,0 +1,14 @@
+{
+  "name": "parkiq-parking-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file=.env.local api/index.js",
+    "init-db": "node --env-file=.env.local scripts/init_db.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

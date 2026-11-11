@@ -1,0 +1,11 @@
+.env*
+/*.php
+/database.sql
+/README.md
+/scripts/
+/includes/
+/php/
+/staff/
+/user/
+/css/
+/js/
